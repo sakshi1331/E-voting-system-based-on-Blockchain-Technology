@@ -32,9 +32,12 @@ App = {
   showMainInterface: function () {
     $('#loginSection').hide();
     $('#mainSection').show();
+    $('#studentName').text(App.student.firstName + ' ' + App.student.lastName);
+    $('#studentEmail').text(App.student.email);
     App.initWeb3();
   },
 
+  // Register Form
   register: function () {
     const data = {
       studentId: $('#registerStudentId').val(),
@@ -52,19 +55,20 @@ App = {
       contentType: 'application/json',
       data: JSON.stringify(data),
       success: function (response) {
-        alert('Registration successful! Check your email to verify your account.');
+        alert('✅ Registration successful!\n\nCheck your email to verify your account.');
         $('#registerForm')[0].reset();
-        $('#registerSection').hide();
-        $('#loginSection').show();
+        App.switchToLogin();
       },
       error: function (error) {
-        alert('Registration failed: ' + (error.responseJSON?.message || 'Unknown error'));
+        const message = error.responseJSON?.message || 'Unknown error';
+        alert('❌ Registration failed:\n' + message);
       }
     });
 
     return false;
   },
 
+  // Login Form
   login: function () {
     const email = $('#loginEmail').val();
     const password = $('#loginPassword').val();
@@ -83,13 +87,26 @@ App = {
         App.showMainInterface();
       },
       error: function (error) {
-        alert('Login failed: ' + (error.responseJSON?.message || 'Invalid credentials'));
+        const message = error.responseJSON?.message || 'Invalid credentials';
+        alert('❌ Login failed:\n' + message);
       }
     });
 
     return false;
   },
 
+  // Switch between register and login
+  switchToLogin: function () {
+    $('.tab-content').removeClass('active');
+    $('#loginTab').addClass('active');
+  },
+
+  switchToRegister: function () {
+    $('.tab-content').removeClass('active');
+    $('#registerTab').addClass('active');
+  },
+
+  // Initialize Web3
   initWeb3: function () {
     if (typeof web3 !== 'undefined') {
       App.web3Provider = web3.currentProvider;
@@ -108,6 +125,7 @@ App = {
     });
   },
 
+  // Request Wallet Verification
   requestWalletVerification: function () {
     $.ajax({
       url: `${App.apiUrl}/wallet/request-verification`,
@@ -116,30 +134,32 @@ App = {
       contentType: 'application/json',
       data: JSON.stringify({ walletAddress: App.account }),
       success: function (response) {
-        alert('Verification message prepared. Please sign it with your wallet.');
+        alert('✅ Verification message prepared.\n\nPlease sign it with your wallet.');
         App.signWalletMessage(response.verificationData);
       },
       error: function (error) {
-        alert('Error: ' + (error.responseJSON?.message || 'Failed to request verification'));
+        const message = error.responseJSON?.message || 'Failed to request verification';
+        alert('❌ Error:\n' + message);
       }
     });
   },
 
+  // Sign Wallet Message
   signWalletMessage: function (verificationData) {
     web3.personal.sign(
       verificationData.message,
       App.account,
       function (err, signature) {
         if (err) {
-          alert('Signing failed: ' + err.message);
+          alert('❌ Signing failed:\n' + err.message);
           return;
         }
-
         App.verifyWalletSignature(App.account, signature);
       }
     );
   },
 
+  // Verify Wallet Signature
   verifyWalletSignature: function (walletAddress, signature) {
     $.ajax({
       url: `${App.apiUrl}/wallet/verify-signature`,
@@ -148,15 +168,17 @@ App = {
       contentType: 'application/json',
       data: JSON.stringify({ walletAddress, signature }),
       success: function (response) {
-        alert('Wallet verified successfully!');
+        alert('✅ Wallet verified successfully!');
         App.checkWalletStatus();
       },
       error: function (error) {
-        alert('Verification failed: ' + (error.responseJSON?.message || 'Signature verification failed'));
+        const message = error.responseJSON?.message || 'Signature verification failed';
+        alert('❌ Verification failed:\n' + message);
       }
     });
   },
 
+  // Check Wallet Status
   checkWalletStatus: function () {
     $.ajax({
       url: `${App.apiUrl}/wallet/status`,
@@ -164,18 +186,20 @@ App = {
       headers: { 'Authorization': `Bearer ${App.accessToken}` },
       success: function (response) {
         if (response.walletVerified) {
-          $('#walletStatus').html('<span style="color: green;">✓ Verified</span>');
+          $('#walletStatus').html('<span style="color: green; font-weight: bold;">✓ Verified</span>');
           $('#verifyWalletBtn').hide();
           App.loadElectionData();
         } else {
-          $('#walletStatus').html('<span style="color: red;">✗ Not Verified</span>');
+          $('#walletStatus').html('<span style="color: red; font-weight: bold;">✗ Not Verified</span>');
           $('#verifyWalletBtn').show();
         }
       }
     });
   },
 
+  // Load Election Data
   loadElectionData: function () {
+    // Get candidates
     $.ajax({
       url: `${App.apiUrl}/voting/candidates`,
       type: 'GET',
@@ -185,6 +209,7 @@ App = {
       }
     });
 
+    // Get election status
     $.ajax({
       url: `${App.apiUrl}/voting/election-status`,
       type: 'GET',
@@ -192,13 +217,14 @@ App = {
       success: function (response) {
         App.electionActive = response.electionActive;
         if (App.electionActive) {
-          $('#electionStatus').html('<span style="color: green;">✓ Active</span>');
+          $('#electionStatus').html('<span style="color: green; font-weight: bold;">✓ Active</span>');
         } else {
-          $('#electionStatus').html('<span style="color: red;">✗ Not Active</span>');
+          $('#electionStatus').html('<span style="color: red; font-weight: bold;">✗ Not Active</span>');
         }
       }
     });
 
+    // Get voting status
     $.ajax({
       url: `${App.apiUrl}/voting/status`,
       type: 'GET',
@@ -206,10 +232,10 @@ App = {
       success: function (response) {
         if (response.hasVoted) {
           $('#voteForm').hide();
-          $('#voteStatus').show().text('You have already voted');
+          $('#voteStatus').show().html('You have already voted');
         } else if (!response.eligibleToVote) {
           $('#voteForm').hide();
-          $('#voteStatus').show().text('Please verify your wallet before voting');
+          $('#voteStatus').show().html('Please verify your wallet before voting');
         } else {
           $('#voteForm').show();
           $('#voteStatus').hide();
@@ -218,6 +244,7 @@ App = {
     });
   },
 
+  // Render Candidates
   renderCandidates: function (candidates) {
     const candidatesResults = $('#candidatesResults');
     const candidatesSelect = $('#candidatesSelect');
@@ -234,6 +261,7 @@ App = {
     });
   },
 
+  // Cast Vote
   castVote: function () {
     const candidateId = $('#candidatesSelect').val();
 
@@ -244,17 +272,18 @@ App = {
       contentType: 'application/json',
       data: JSON.stringify({ candidateId: parseInt(candidateId) }),
       success: function (response) {
-        // Frontend signs and sends the transaction
         App.sendBlockchainVote(response.transactionData);
       },
       error: function (error) {
-        alert('Error: ' + (error.responseJSON?.message || 'Failed to cast vote'));
+        const message = error.responseJSON?.message || 'Failed to cast vote';
+        alert('❌ Error:\n' + message);
       }
     });
 
     return false;
   },
 
+  // Send Blockchain Vote
   sendBlockchainVote: function (txData) {
     web3.eth.sendTransaction({
       from: App.account,
@@ -263,18 +292,24 @@ App = {
       gas: 300000
     }, function (err, txHash) {
       if (err) {
-        alert('Transaction failed: ' + err.message);
+        alert('❌ Transaction failed:\n' + err.message);
       } else {
-        alert('Vote submitted! Transaction hash: ' + txHash);
+        alert('✅ Vote submitted!\n\nTransaction hash:\n' + txHash);
         setTimeout(() => App.loadElectionData(), 2000);
       }
     });
   },
 
+  // Logout
   logout: function () {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('student');
-    App.showLoginInterface();
+    if (confirm('Are you sure you want to logout?')) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('student');
+      App.showLoginInterface();
+      $('form').each(function() {
+        this.reset();
+      });
+    }
   }
 };
 
