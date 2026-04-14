@@ -1,134 +1,141 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Election Voting</title>
-
-  <!-- Bootstrap -->
+  <title>E-Voting System with Auth</title>
   <link href="css/bootstrap.min.css" rel="stylesheet">
-  <link href="css/styles.css" rel="stylesheet">
-  </link>
-
-  <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
-  <!--[if lt IE 9]>
-      <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
-      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-    <![endif]-->
   <style>
-    .admin-panel {
-      background-color: #fff3cd;
-      border: 2px solid #ffc107;
-      padding: 20px;
-      border-radius: 5px;
-      margin-bottom: 20px;
-    }
-    .election-status {
-      padding: 10px;
-      border-radius: 5px;
-      margin-bottom: 20px;
-      font-size: 16px;
-    }
-    .btn-admin {
-      margin-right: 10px;
-    }
-    .alert-info-custom {
-      background-color: #d1ecf1;
-      border: 1px solid #bee5eb;
-      color: #0c5460;
-      padding: 12px;
-      border-radius: 4px;
-      margin-bottom: 15px;
-    }
+    .auth-container { max-width: 500px; margin: 50px auto; }
+    .form-section { margin-bottom: 20px; }
+    .form-section input, .form-section select { margin: 10px 0; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .status-badge { padding: 5px 10px; border-radius: 3px; font-weight: bold; }
+    .status-ok { background: #d4edda; color: #155724; }
+    .status-warn { background: #fff3cd; color: #856404; }
   </style>
 </head>
-
 <body>
-  <div class="container" style="width: 650px;">
-    <div class="row">
-      <div class="col-lg-12">
-        <div class="row">
-          <h1 class="text-center"><span id="tag">E-Voting </span>Election Results</h1>
-          <h1 class="text-end">Live</h1>
-        </div>
-        <hr />
-        <br />
+  <div class="container">
+    <!-- Login Section -->
+    <div id="loginSection" style="display: none;">
+      <div class="auth-container">
+        <h2>E-Voting System</h2>
         
-        <!-- Admin Panel -->
-        <div id="adminPanel" class="admin-panel" style="display: none;">
-          <h4>Admin Control Panel</h4>
-          <button class="btn btn-success btn-admin" onclick="App.startElection();">Start Election</button>
-          <button class="btn btn-danger btn-admin" onclick="App.endElection();">End Election</button>
-          <p style="margin-top: 10px; font-size: 12px;">
-            <strong>Note:</strong> Use these buttons to control the election status.
+        <!-- Login Tab -->
+        <div id="loginTab" class="tab-content active">
+          <h4>Login</h4>
+          <form onsubmit="App.login(); return false;">
+            <input type="email" id="loginEmail" placeholder="College Email" class="form-control" required>
+            <input type="password" id="loginPassword" placeholder="Password" class="form-control" required>
+            <button type="submit" class="btn btn-primary">Login</button>
+          </form>
+          <p style="margin-top: 15px;">
+            <a href="#" onclick="$('.tab-content').removeClass('active'); $('#registerTab').addClass('active'); return false;">
+              Don't have an account? Register here
+            </a>
           </p>
         </div>
 
-        <!-- Election Status Display -->
-        <div id="electionStatus" class="election-status" style="background-color: #f0f0f0; border-left: 4px solid #666;">
+        <!-- Register Tab -->
+        <div id="registerTab" class="tab-content">
+          <h4>Register</h4>
+          <form onsubmit="App.register(); return false;">
+            <input type="text" id="registerStudentId" placeholder="Student ID" class="form-control" required>
+            <input type="text" id="registerFirstName" placeholder="First Name" class="form-control" required>
+            <input type="text" id="registerLastName" placeholder="Last Name" class="form-control" required>
+            <input type="email" id="registerEmail" placeholder="College Email (@college.edu)" class="form-control" required>
+            <select id="registerDepartment" class="form-control" required>
+              <option value="">Select Department</option>
+              <option value="CSE">Computer Science</option>
+              <option value="ECE">Electronics</option>
+              <option value="ME">Mechanical</option>
+              <option value="CE">Civil</option>
+            </select>
+            <select id="registerSemester" class="form-control" required>
+              <option value="">Select Semester</option>
+              <option value="1">1st Semester</option>
+              <option value="2">2nd Semester</option>
+              <option value="3">3rd Semester</option>
+              <option value="4">4th Semester</option>
+              <option value="5">5th Semester</option>
+              <option value="6">6th Semester</option>
+              <option value="7">7th Semester</option>
+              <option value="8">8th Semester</option>
+            </select>
+            <input type="password" id="registerPassword" placeholder="Password (min 8 chars, uppercase, number)" class="form-control" required>
+            <button type="submit" class="btn btn-success">Register</button>
+          </form>
+          <p style="margin-top: 15px;">
+            <a href="#" onclick="$('.tab-content').removeClass('active'); $('#loginTab').addClass('active'); return false;">
+              Already have an account? Login here
+            </a>
+          </p>
         </div>
+      </div>
+    </div>
 
-        <div id="loader">
-          <p class="text-center">Loading...</p>
-        </div>
+    <!-- Main Section -->
+    <div id="mainSection" style="display: none;">
+      <div class="row">
+        <div class="col-md-12">
+          <h1>E-Voting System</h1>
+          <button class="btn btn-danger float-end" onclick="App.logout();">Logout</button>
+          <hr>
 
-        <div id="content" style="display: none;">
+          <!-- Status Dashboard -->
+          <div class="row mb-4">
+            <div class="col-md-4">
+              <strong>Student:</strong> <span id="studentName"></span><br>
+              <strong>Email:</strong> <span id="studentEmail"></span>
+            </div>
+            <div class="col-md-4">
+              <strong>Wallet:</strong> <span id="walletAddress" style="font-family: monospace;"></span><br>
+              <strong>Status:</strong> <span id="walletStatus" class="status-badge status-warn"></span>
+            </div>
+            <div class="col-md-4">
+              <strong>Election:</strong> <span id="electionStatus" class="status-badge status-warn"></span><br>
+              <button id="verifyWalletBtn" class="btn btn-sm btn-info" onclick="App.requestWalletVerification();">
+                Verify Wallet
+              </button>
+            </div>
+          </div>
+
+          <!-- Candidates Table -->
+          <h3>Candidates</h3>
           <table class="table">
             <thead>
               <tr>
-                <th scope="col">#ID</th>
-                <th scope="col">Candidate Name</th>
-                <th scope="col">Vote Count</th>
+                <th>#ID</th>
+                <th>Name</th>
+                <th>Votes</th>
               </tr>
             </thead>
-            <tbody id="candidatesResults">
-            </tbody>
+            <tbody id="candidatesResults"></tbody>
           </table>
-          <hr />
-
-          <!-- Alerts for election status -->
-          <div id="electionNotStartedStatus" class="alert-info-custom" style="display: none;">
-            <strong>Election has not started yet.</strong> Please wait for the admin to start the election.
-          </div>
-
-          <div id="electionClosedStatus" class="alert-info-custom" style="display: none;">
-            <strong>Election has ended.</strong> Voting is no longer available. View the final results above.
-          </div>
 
           <!-- Voting Form -->
-          <form onSubmit="App.castVote(); return false;">
+          <h3>Cast Your Vote</h3>
+          <div id="voteStatus" style="display: none;" class="alert alert-info"></div>
+          <form id="voteForm" onsubmit="App.castVote(); return false;" style="display: none;">
             <div class="form-group">
-              <label for="candidatesSelect">Select Candidate</label>
-              <select class="form-control" id="candidatesSelect">
-              </select>
+              <label>Select Candidate:</label>
+              <select id="candidatesSelect" class="form-control" required></select>
             </div>
             <button type="submit" class="btn btn-primary">Vote</button>
-            <div id="note">Please note that vote once recorded cannot be changed!</div>
-            <hr />
+            <p class="text-muted">Note: Your vote cannot be changed once submitted.</p>
           </form>
-
-          <!-- Vote confirmation -->
-          <div id="voteStatus" style="display: none;" class="alert alert-success">
-            Your vote has been recorded.
-          </div>
-
-          <!-- Account Address -->
-          <div id="accountAddress" class="text-center"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- jQuery -->
+  <!-- Scripts -->
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-  <!-- Bootstrap JS -->
   <script src="js/bootstrap.min.js"></script>
-  <!-- Web3 and Truffle -->
   <script src="js/web3.min.js"></script>
   <script src="js/truffle-contract.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/app-with-auth.js"></script>
 </body>
-
 </html>
