@@ -1,217 +1,283 @@
 App = {
-    web3Provider: null,
-    contracts: {},
-    account: '0x0',
-    admin: '0x0',
-    hasVoted: false,
-    electionStarted: false,
-    electionEnded: false,
+  web3Provider: null,
+  contracts: {},
+  account: '0x0',
+  apiUrl: 'http://localhost:5000/api',
+  accessToken: null,
+  student: null,
+  electionActive: false,
 
-    init: function () {
-        return App.initWeb3();
-    },
+  init: function () {
+    this.checkAuthentication();
+  },
 
-    initWeb3: function () {
-        if (typeof web3 !== 'undefined') {
-            App.web3Provider = web3.currentProvider;
-            web3 = new Web3(web3.currentProvider);
-        } else {
-            App.web3Provider = new Web3.providers.HttpProvider('http://localhost:7545');
-            web3 = new Web3(App.web3Provider);
-        }
-        return App.initContract();
-    },
+  checkAuthentication: function () {
+    const token = localStorage.getItem('accessToken');
+    const studentData = localStorage.getItem('student');
 
-    initContract: function () {
-        $.getJSON("Election.json", function (election) {
-            App.contracts.Election = TruffleContract(election);
-            App.contracts.Election.setProvider(App.web3Provider);
-            return App.render();
-        });
-    },
-
-    render: function () {
-        var electionInstance;
-        var loader = $("#loader");
-        var content = $("#content");
-
-        loader.show();
-        content.hide();
-
-        // Load account data
-        web3.eth.getCoinbase(function (err, account) {
-            if (err === null) {
-                App.account = account;
-                $("#accountAddress").html(
-                    "<span id='accountTag'>Your Account :</span> <span id='myAccount'>" + account + "</span>"
-                );
-            }
-        });
-
-        // Load contract data
-        App.contracts.Election.deployed().then(function (instance) {
-            electionInstance = instance;
-            return electionInstance.admin();
-        }).then(function (adminAddress) {
-            App.admin = adminAddress;
-            
-            // Check if current account is admin
-            if (App.account.toLowerCase() === App.admin.toLowerCase()) {
-                $("#adminPanel").show();
-            } else {
-                $("#adminPanel").hide();
-            }
-            
-            // Get election status
-            return electionInstance.getElectionStatus();
-        }).then(function (status) {
-            App.electionStarted = status[0];
-            App.electionEnded = status[1];
-            
-            // Update status display
-            App.updateElectionStatus();
-            
-            return electionInstance.candidatesCount();
-        }).then(function (candidatesCount) {
-            var candidatesResults = $("#candidatesResults");
-            candidatesResults.empty();
-
-            var candidatesSelect = $('#candidatesSelect');
-            candidatesSelect.empty();
-
-            for (var i = 1; i <= candidatesCount; i++) {
-                electionInstance.candidates(i).then(function (candidate) {
-                    var id = candidate[0];
-                    var name = candidate[1];
-                    var voteCount = candidate[2];
-
-                    // Render candidate Result
-                    var candidateTemplate = "<tr><td>" + id + "</td><td>" + name + "</td><td>" + voteCount + "</td></tr>";
-                    candidatesResults.append(candidateTemplate);
-
-                    // Render candidate ballot option
-                    var candidateOption = "<option value='" + id + "'>" + name + "</option>";
-                    candidatesSelect.append(candidateOption);
-                });
-            }
-            
-            return electionInstance.voters(App.account);
-        }).then(function (hasVoted) {
-            App.hasVoted = hasVoted;
-            
-            // Show/hide voting form based on election status and vote status
-            if (!App.electionStarted || App.electionEnded) {
-                $('form').hide();
-                if (App.electionEnded) {
-                    $("#electionClosedStatus").show();
-                } else {
-                    $("#electionNotStartedStatus").show();
-                }
-            } else if (App.hasVoted) {
-                $('form').hide();
-                $("#voteStatus").show();
-            } else {
-                $('form').show();
-                $("#voteStatus").hide();
-                $("#electionClosedStatus").hide();
-                $("#electionNotStartedStatus").hide();
-            }
-            
-            loader.hide();
-            content.show();
-        }).catch(function (error) {
-            console.warn(error);
-        });
-    },
-
-    updateElectionStatus: function () {
-        var statusHtml = "<strong>Election Status:</strong> ";
-        
-        if (!App.electionStarted) {
-            statusHtml += "<span style='color: red;'>Not Started</span>";
-        } else if (App.electionEnded) {
-            statusHtml += "<span style='color: red;'>Ended</span>";
-        } else {
-            statusHtml += "<span style='color: green;'>Active</span>";
-        }
-        
-        $("#electionStatus").html(statusHtml);
-    },
-
-    castVote: function () {
-        if (!App.electionStarted) {
-            alert("Election has not started yet!");
-            return false;
-        }
-        
-        if (App.electionEnded) {
-            alert("Election has ended!");
-            return false;
-        }
-        
-        var candidateId = $('#candidatesSelect').val();
-        App.contracts.Election.deployed().then(function (instance) {
-            return instance.vote(candidateId, { from: App.account });
-        }).then(function (result) {
-            $("#content").hide();
-            $("#loader").show();
-            // Reload after a short delay
-            setTimeout(function() {
-                App.render();
-            }, 1000);
-        }).catch(function (err) {
-            console.error(err);
-            alert("Error casting vote: " + err.message);
-        });
-        
-        return false;
-    },
-
-    startElection: function () {
-        if (App.account.toLowerCase() !== App.admin.toLowerCase()) {
-            alert("Only admin can start the election!");
-            return false;
-        }
-        
-        App.contracts.Election.deployed().then(function (instance) {
-            return instance.startElection({ from: App.account });
-        }).then(function (result) {
-            alert("Election started successfully!");
-            setTimeout(function() {
-                App.render();
-            }, 1000);
-        }).catch(function (err) {
-            console.error(err);
-            alert("Error starting election: " + err.message);
-        });
-        
-        return false;
-    },
-
-    endElection: function () {
-        if (App.account.toLowerCase() !== App.admin.toLowerCase()) {
-            alert("Only admin can end the election!");
-            return false;
-        }
-        
-        App.contracts.Election.deployed().then(function (instance) {
-            return instance.endElection({ from: App.account });
-        }).then(function (result) {
-            alert("Election ended successfully!");
-            setTimeout(function() {
-                App.render();
-            }, 1000);
-        }).catch(function (err) {
-            console.error(err);
-            alert("Error ending election: " + err.message);
-        });
-        
-        return false;
+    if (token && studentData) {
+      App.accessToken = token;
+      App.student = JSON.parse(studentData);
+      App.showMainInterface();
+    } else {
+      App.showLoginInterface();
     }
+  },
+
+  showLoginInterface: function () {
+    $('#loginSection').show();
+    $('#mainSection').hide();
+  },
+
+  showMainInterface: function () {
+    $('#loginSection').hide();
+    $('#mainSection').show();
+    App.initWeb3();
+  },
+
+  register: function () {
+    const data = {
+      studentId: $('#registerStudentId').val(),
+      firstName: $('#registerFirstName').val(),
+      lastName: $('#registerLastName').val(),
+      email: $('#registerEmail').val(),
+      password: $('#registerPassword').val(),
+      department: $('#registerDepartment').val(),
+      semester: parseInt($('#registerSemester').val())
+    };
+
+    $.ajax({
+      url: `${App.apiUrl}/auth/register`,
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify(data),
+      success: function (response) {
+        alert('Registration successful! Check your email to verify your account.');
+        $('#registerForm')[0].reset();
+        $('#registerSection').hide();
+        $('#loginSection').show();
+      },
+      error: function (error) {
+        alert('Registration failed: ' + (error.responseJSON?.message || 'Unknown error'));
+      }
+    });
+
+    return false;
+  },
+
+  login: function () {
+    const email = $('#loginEmail').val();
+    const password = $('#loginPassword').val();
+
+    $.ajax({
+      url: `${App.apiUrl}/auth/login`,
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ email, password }),
+      success: function (response) {
+        localStorage.setItem('accessToken', response.accessToken);
+        localStorage.setItem('student', JSON.stringify(response.student));
+        App.accessToken = response.accessToken;
+        App.student = response.student;
+        $('#loginForm')[0].reset();
+        App.showMainInterface();
+      },
+      error: function (error) {
+        alert('Login failed: ' + (error.responseJSON?.message || 'Invalid credentials'));
+      }
+    });
+
+    return false;
+  },
+
+  initWeb3: function () {
+    if (typeof web3 !== 'undefined') {
+      App.web3Provider = web3.currentProvider;
+      web3 = new Web3(web3.currentProvider);
+    } else {
+      App.web3Provider = new Web3.providers.HttpProvider('http://localhost:7545');
+      web3 = new Web3(App.web3Provider);
+    }
+
+    web3.eth.getCoinbase(function (err, account) {
+      if (err === null) {
+        App.account = account;
+        $('#walletAddress').text(account);
+        App.checkWalletStatus();
+      }
+    });
+  },
+
+  requestWalletVerification: function () {
+    $.ajax({
+      url: `${App.apiUrl}/wallet/request-verification`,
+      type: 'POST',
+      headers: { 'Authorization': `Bearer ${App.accessToken}` },
+      contentType: 'application/json',
+      data: JSON.stringify({ walletAddress: App.account }),
+      success: function (response) {
+        alert('Verification message prepared. Please sign it with your wallet.');
+        App.signWalletMessage(response.verificationData);
+      },
+      error: function (error) {
+        alert('Error: ' + (error.responseJSON?.message || 'Failed to request verification'));
+      }
+    });
+  },
+
+  signWalletMessage: function (verificationData) {
+    web3.personal.sign(
+      verificationData.message,
+      App.account,
+      function (err, signature) {
+        if (err) {
+          alert('Signing failed: ' + err.message);
+          return;
+        }
+
+        App.verifyWalletSignature(App.account, signature);
+      }
+    );
+  },
+
+  verifyWalletSignature: function (walletAddress, signature) {
+    $.ajax({
+      url: `${App.apiUrl}/wallet/verify-signature`,
+      type: 'POST',
+      headers: { 'Authorization': `Bearer ${App.accessToken}` },
+      contentType: 'application/json',
+      data: JSON.stringify({ walletAddress, signature }),
+      success: function (response) {
+        alert('Wallet verified successfully!');
+        App.checkWalletStatus();
+      },
+      error: function (error) {
+        alert('Verification failed: ' + (error.responseJSON?.message || 'Signature verification failed'));
+      }
+    });
+  },
+
+  checkWalletStatus: function () {
+    $.ajax({
+      url: `${App.apiUrl}/wallet/status`,
+      type: 'GET',
+      headers: { 'Authorization': `Bearer ${App.accessToken}` },
+      success: function (response) {
+        if (response.walletVerified) {
+          $('#walletStatus').html('<span style="color: green;">✓ Verified</span>');
+          $('#verifyWalletBtn').hide();
+          App.loadElectionData();
+        } else {
+          $('#walletStatus').html('<span style="color: red;">✗ Not Verified</span>');
+          $('#verifyWalletBtn').show();
+        }
+      }
+    });
+  },
+
+  loadElectionData: function () {
+    $.ajax({
+      url: `${App.apiUrl}/voting/candidates`,
+      type: 'GET',
+      headers: { 'Authorization': `Bearer ${App.accessToken}` },
+      success: function (response) {
+        App.renderCandidates(response.candidates);
+      }
+    });
+
+    $.ajax({
+      url: `${App.apiUrl}/voting/election-status`,
+      type: 'GET',
+      headers: { 'Authorization': `Bearer ${App.accessToken}` },
+      success: function (response) {
+        App.electionActive = response.electionActive;
+        if (App.electionActive) {
+          $('#electionStatus').html('<span style="color: green;">✓ Active</span>');
+        } else {
+          $('#electionStatus').html('<span style="color: red;">✗ Not Active</span>');
+        }
+      }
+    });
+
+    $.ajax({
+      url: `${App.apiUrl}/voting/status`,
+      type: 'GET',
+      headers: { 'Authorization': `Bearer ${App.accessToken}` },
+      success: function (response) {
+        if (response.hasVoted) {
+          $('#voteForm').hide();
+          $('#voteStatus').show().text('You have already voted');
+        } else if (!response.eligibleToVote) {
+          $('#voteForm').hide();
+          $('#voteStatus').show().text('Please verify your wallet before voting');
+        } else {
+          $('#voteForm').show();
+          $('#voteStatus').hide();
+        }
+      }
+    });
+  },
+
+  renderCandidates: function (candidates) {
+    const candidatesResults = $('#candidatesResults');
+    const candidatesSelect = $('#candidatesSelect');
+    
+    candidatesResults.empty();
+    candidatesSelect.empty();
+
+    candidates.forEach(function (candidate) {
+      const row = `<tr><td>${candidate.id}</td><td>${candidate.name}</td><td>${candidate.voteCount}</td></tr>`;
+      candidatesResults.append(row);
+
+      const option = `<option value="${candidate.id}">${candidate.name}</option>`;
+      candidatesSelect.append(option);
+    });
+  },
+
+  castVote: function () {
+    const candidateId = $('#candidatesSelect').val();
+
+    $.ajax({
+      url: `${App.apiUrl}/voting/cast-vote`,
+      type: 'POST',
+      headers: { 'Authorization': `Bearer ${App.accessToken}` },
+      contentType: 'application/json',
+      data: JSON.stringify({ candidateId: parseInt(candidateId) }),
+      success: function (response) {
+        // Frontend signs and sends the transaction
+        App.sendBlockchainVote(response.transactionData);
+      },
+      error: function (error) {
+        alert('Error: ' + (error.responseJSON?.message || 'Failed to cast vote'));
+      }
+    });
+
+    return false;
+  },
+
+  sendBlockchainVote: function (txData) {
+    web3.eth.sendTransaction({
+      from: App.account,
+      to: txData.to,
+      data: txData.data,
+      gas: 300000
+    }, function (err, txHash) {
+      if (err) {
+        alert('Transaction failed: ' + err.message);
+      } else {
+        alert('Vote submitted! Transaction hash: ' + txHash);
+        setTimeout(() => App.loadElectionData(), 2000);
+      }
+    });
+  },
+
+  logout: function () {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('student');
+    App.showLoginInterface();
+  }
 };
 
 $(function () {
-    $(window).load(function () {
-        App.init();
-    });
+  App.init();
 });
